@@ -4,12 +4,14 @@ import { Canvas } from "@react-three/fiber";
 import { OrbitControls, ContactShadows } from "@react-three/drei";
 import Room from "./Room";
 import { School } from "@/lib/schools";
+import { SelectedItems } from "@/lib/products";
 
 type StudioCanvasProps = {
   school: School;
+  selectedItems: SelectedItems;
 };
 
-export default function StudioCanvas({ school }: StudioCanvasProps) {
+export default function StudioCanvas({ school, selectedItems }: StudioCanvasProps) {
   const { width, depth, height } = school.dimensions;
 
   return (
@@ -59,7 +61,7 @@ export default function StudioCanvas({ school }: StudioCanvasProps) {
         />
 
         {/* Room */}
-        <Room width={width} depth={depth} height={height} />
+        <Room width={width} depth={depth} height={height} selectedItems={selectedItems} />
 
         {/* Soft contact shadows on carpet */}
         <ContactShadows

@@ -2,11 +2,13 @@
 
 import { useMemo } from "react";
 import * as THREE from "three";
+import { SelectedItems } from "@/lib/products";
 
 type RoomProps = {
   width: number;  // 15.92
   depth: number;  // 12.0
   height: number; // 9.0
+  selectedItems: SelectedItems;
 };
 
 const OAK      = "#c8a060";
@@ -66,7 +68,7 @@ function useWoodTexture() {
   }, []);
 }
 
-export default function Room({ width, depth, height }: RoomProps) {
+export default function Room({ width, depth, height, selectedItems }: RoomProps) {
   const carpet = useCarpetTexture();
   const wood   = useWoodTexture();
 
@@ -88,6 +90,20 @@ export default function Room({ width, depth, height }: RoomProps) {
   const deskZ = -hd + DD / 2 + 0.05;
 
   const shelfZ = bedZ - BL / 2 + 0.8;   // shelves on side wall, above bed/desk transition
+
+  // ── Derive selected item properties ──────────────────────────────────────────
+  const comforterColor  = selectedItems["Comforters"]?.color;
+  const sheetsColor     = selectedItems["Sheets"]?.color;
+  const rugColor        = selectedItems["Rugs"]?.color;
+  const posterColor     = selectedItems["Posters"]?.color;
+  const lampColor       = selectedItems["Desk Lamps"]?.color;
+
+  const stringLightsItem = selectedItems["String Lights"];
+  const stringLightColor = (stringLightsItem && stringLightsItem.id !== "lights-none")
+    ? stringLightsItem.color : undefined;
+
+  const ledItem  = selectedItems["LED Strips"];
+  const ledColor = (ledItem && ledItem.id !== "led-none") ? ledItem.color : undefined;
 
   return (
     <group>
@@ -125,19 +141,95 @@ export default function Room({ width, depth, height }: RoomProps) {
         <meshStandardMaterial color={WALL} roughness={0.85} transparent opacity={0.15} />
       </mesh>
 
+      {/* ── RUG — center of room between the two setups ── */}
+      {rugColor && (
+        <mesh position={[0, 0.02, 0.5]} receiveShadow>
+          <boxGeometry args={[6, 0.05, 4]} />
+          <meshStandardMaterial color={rugColor} roughness={0.92} />
+        </mesh>
+      )}
+
+      {/* ── POSTERS — centered on back wall between windows ── */}
+      {posterColor && (
+        <mesh position={[0, height * 0.28, -hd + 0.02]}>
+          <boxGeometry args={[2.2, 3.0, 0.02]} />
+          <meshStandardMaterial color={posterColor} roughness={0.7} />
+        </mesh>
+      )}
+
+      {/* ── STRING LIGHTS — along back wall near ceiling ── */}
+      {stringLightColor && (
+        <group>
+          {Array.from({ length: 14 }).map((_, i) => (
+            <mesh
+              key={i}
+              position={[
+                -hw + 1.2 + (i * (width - 2.4)) / 13,
+                height - 0.55,
+                -hd + 0.18,
+              ]}
+            >
+              <sphereGeometry args={[0.07, 8, 8]} />
+              <meshStandardMaterial
+                color={stringLightColor}
+                emissive={stringLightColor}
+                emissiveIntensity={3}
+                roughness={0.3}
+              />
+            </mesh>
+          ))}
+        </group>
+      )}
+
+      {/* ── LED STRIPS — along all four ceiling-wall junctions ── */}
+      {ledColor && (
+        <group>
+          {/* Back wall */}
+          <mesh position={[0, height - 0.08, -hd + 0.03]}>
+            <boxGeometry args={[width - 0.1, 0.04, 0.04]} />
+            <meshStandardMaterial color={ledColor} emissive={ledColor} emissiveIntensity={4} />
+          </mesh>
+          {/* Front wall */}
+          <mesh position={[0, height - 0.08, hd - 0.03]}>
+            <boxGeometry args={[width - 0.1, 0.04, 0.04]} />
+            <meshStandardMaterial color={ledColor} emissive={ledColor} emissiveIntensity={4} />
+          </mesh>
+          {/* Left wall */}
+          <mesh position={[-hw + 0.03, height - 0.08, 0]}>
+            <boxGeometry args={[0.04, 0.04, depth - 0.1]} />
+            <meshStandardMaterial color={ledColor} emissive={ledColor} emissiveIntensity={4} />
+          </mesh>
+          {/* Right wall */}
+          <mesh position={[hw - 0.03, height - 0.08, 0]}>
+            <boxGeometry args={[0.04, 0.04, depth - 0.1]} />
+            <meshStandardMaterial color={ledColor} emissive={ledColor} emissiveIntensity={4} />
+          </mesh>
+        </group>
+      )}
+
       {/* ── CEILING LIGHT ── */}
       <FluorescentLight position={[0, height - 0.05, 0]} />
 
       {/* ════ LEFT STUDENT SETUP ════ */}
       <Closet position={[-hw + CD/2, 0, closetZ]} cw={CW} cd={CD} ch={height * 0.94} side="left" />
-      <LoftedBed position={[-hw + BW/2, 0, bedZ]} bl={BL} bw={BW} wood={wood} />
-      <Desk position={[-deskX, 0, deskZ]} dd={DD} wood={wood} />
+      <LoftedBed
+        position={[-hw + BW/2, 0, bedZ]}
+        bl={BL} bw={BW} wood={wood}
+        comforterColor={comforterColor}
+        sheetsColor={sheetsColor}
+      />
+      <Desk position={[-deskX, 0, deskZ]} dd={DD} wood={wood} lampColor={lampColor} />
       <WallShelf position={[-hw + 0.08, 5.8, shelfZ]} side="left" />
 
       {/* ════ RIGHT STUDENT SETUP (mirrored) ════ */}
       <Closet position={[hw - CD/2, 0, closetZ]} cw={CW} cd={CD} ch={height * 0.94} side="right" />
-      <LoftedBed position={[hw - BW/2, 0, bedZ]} bl={BL} bw={BW} wood={wood} />
-      <Desk position={[deskX, 0, deskZ]} dd={DD} wood={wood} />
+      <LoftedBed
+        position={[hw - BW/2, 0, bedZ]}
+        bl={BL} bw={BW} wood={wood}
+        comforterColor={comforterColor}
+        sheetsColor={sheetsColor}
+      />
+      <Desk position={[deskX, 0, deskZ]} dd={DD} wood={wood} lampColor={lampColor} />
       <WallShelf position={[hw - 0.08, 5.8, shelfZ]} side="right" />
 
       {/* ════ BACK WALL — two windows above desks ════ */}
@@ -211,17 +303,18 @@ function Closet({
   );
 }
 
-// ── Lofted bed with dresser underneath, drawers facing carpet ─────────────────
+// ── Lofted bed with dresser underneath, optional bedding ─────────────────────
 function LoftedBed({
-  position, bl, bw, wood,
+  position, bl, bw, wood, comforterColor, sheetsColor,
 }: {
   position: [number, number, number];
   bl: number; bw: number;
   wood: THREE.CanvasTexture;
+  comforterColor?: string;
+  sheetsColor?: string;
 }) {
   const LOFT = 2.6;
   const SLATS = 5;
-  // Dresser dimensions (under bed, drawers face toward room center = +x for left bed, -x for right)
   const DRW = bw * 0.75;
   const DRH = LOFT - 0.15;
   const DRD = bl * 0.55;
@@ -264,17 +357,41 @@ function LoftedBed({
       </mesh>
 
       {/* Mattress */}
-      <mesh position={[0, LOFT + 0.4, 0]} castShadow>
-        <boxGeometry args={[bw - 0.06, 0.58, bl - 0.04]} />
-        <meshStandardMaterial color="#1a1a1a" roughness={0.9} />
+      <mesh position={[0, LOFT + 0.37, 0]} castShadow>
+        <boxGeometry args={[bw - 0.06, 0.52, bl - 0.04]} />
+        <meshStandardMaterial color="#d8d4cc" roughness={0.8} />
       </mesh>
 
-      {/* ── Dresser under bed, drawers facing carpet center ── */}
+      {/* Sheets — thin layer visible at foot/sides of mattress */}
+      {sheetsColor && (
+        <mesh position={[0, LOFT + 0.64, 0]} castShadow>
+          <boxGeometry args={[bw - 0.07, 0.04, bl - 0.05]} />
+          <meshStandardMaterial color={sheetsColor} roughness={0.85} />
+        </mesh>
+      )}
+
+      {/* Comforter — on top of mattress (or sheets) */}
+      {comforterColor && (
+        <mesh position={[0, LOFT + 0.72, 0]} castShadow>
+          <boxGeometry args={[bw - 0.08, 0.14, bl - 0.06]} />
+          <meshStandardMaterial color={comforterColor} roughness={0.95} />
+        </mesh>
+      )}
+
+      {/* Pillow — at head of bed (toward back wall, z negative) */}
+      <mesh position={[0, LOFT + (comforterColor ? 0.82 : 0.72), -bl/2 + 0.55]} castShadow>
+        <boxGeometry args={[bw * 0.65, 0.12, 0.55]} />
+        <meshStandardMaterial
+          color={sheetsColor ?? "#e8e4de"}
+          roughness={0.9}
+        />
+      </mesh>
+
+      {/* ── Dresser under bed ── */}
       <mesh position={[0, DRH/2, bl/2 - DRD/2 - 0.1]} castShadow>
         <boxGeometry args={[DRW, DRH, DRD]} />
         <meshStandardMaterial map={wood} color={OAK} roughness={0.6} />
       </mesh>
-      {/* Drawer fronts — face toward room center (positive z = toward carpet) */}
       {[0.55, 0, -0.55].map((dy, i) => (
         <group key={i}>
           <mesh position={[0, DRH/2 + dy * (DRH/3.2), bl/2 - 0.08]} castShadow>
@@ -291,21 +408,24 @@ function LoftedBed({
   );
 }
 
-// ── Desk (against back wall, student faces window) ────────────────────────────
+// ── Desk with optional lamp ───────────────────────────────────────────────────
 function Desk({
-  position, dd, wood,
+  position, dd, wood, lampColor,
 }: {
   position: [number, number, number];
   dd: number;
   wood: THREE.CanvasTexture;
+  lampColor?: string;
 }) {
-  const DW = 3.6; // desk width (x-axis)
+  const DW = 3.6;
   return (
     <group position={position}>
+      {/* Desktop */}
       <mesh position={[0, 2.5, 0]} castShadow>
         <boxGeometry args={[DW, 0.1, dd]} />
         <meshStandardMaterial map={wood} roughness={0.45} />
       </mesh>
+      {/* Legs */}
       {([ [-DW/2+0.1,-dd/2+0.1],[DW/2-0.1,-dd/2+0.1],
           [-DW/2+0.1, dd/2-0.1],[DW/2-0.1, dd/2-0.1] ] as [number,number][]).map(([x,z],i)=>(
         <mesh key={i} position={[x, 1.25, z]} castShadow>
@@ -313,8 +433,38 @@ function Desk({
           <meshStandardMaterial color={OAK_DARK} roughness={0.7} />
         </mesh>
       ))}
-      {/* Chair pulled out toward room center (+z) */}
+      {/* Chair */}
       <TaskChair position={[0, 0, dd/2 + 1.0]} />
+      {/* Desk lamp */}
+      {lampColor && <DeskLamp position={[DW/2 - 0.5, 2.55, -dd/2 + 0.3]} color={lampColor} />}
+    </group>
+  );
+}
+
+// ── Desk lamp ─────────────────────────────────────────────────────────────────
+function DeskLamp({ position, color }: { position: [number, number, number]; color: string }) {
+  return (
+    <group position={position}>
+      {/* Base */}
+      <mesh>
+        <cylinderGeometry args={[0.14, 0.16, 0.05, 12]} />
+        <meshStandardMaterial color={color} roughness={0.4} metalness={0.3} />
+      </mesh>
+      {/* Pole */}
+      <mesh position={[0, 0.5, 0]}>
+        <cylinderGeometry args={[0.025, 0.025, 1.0, 8]} />
+        <meshStandardMaterial color={color} roughness={0.4} metalness={0.3} />
+      </mesh>
+      {/* Shade */}
+      <mesh position={[0, 1.08, 0]} rotation={[Math.PI, 0, 0]}>
+        <coneGeometry args={[0.22, 0.32, 12, 1, true]} />
+        <meshStandardMaterial color={color} roughness={0.5} side={THREE.DoubleSide} />
+      </mesh>
+      {/* Bulb glow */}
+      <mesh position={[0, 1.02, 0]}>
+        <sphereGeometry args={[0.05, 8, 8]} />
+        <meshStandardMaterial color="#fffae0" emissive="#fffae0" emissiveIntensity={2} />
+      </mesh>
     </group>
   );
 }
@@ -366,41 +516,35 @@ function TaskChair({ position }: { position: [number, number, number] }) {
   );
 }
 
-// ── 2-tier wall shelf with triangle brackets (like in photo) ──────────────────
+// ── 2-tier wall shelf with triangle brackets ──────────────────────────────────
 function WallShelf({
   position, side,
 }: {
   position: [number, number, number];
   side: "left" | "right";
 }) {
-  const SW = 2.8;  // shelf length along z-axis
-  const SD = 0.85; // shelf depth (sticks out from wall)
+  const SW = 2.8;
+  const SD = 0.85;
   const flip = side === "left" ? 1 : -1;
 
   return (
     <group position={position}>
-      {/* Two shelf tiers */}
       {[0, 1.5].map((dy, ti) => (
         <group key={ti} position={[0, dy, 0]}>
-          {/* Shelf board */}
           <mesh castShadow>
             <boxGeometry args={[SD, 0.06, SW]} />
             <meshStandardMaterial color="#e2dfda" roughness={0.5} />
           </mesh>
-          {/* Triangle brackets (2 per shelf) */}
           {[-SW/2 + 0.3, SW/2 - 0.3].map((z, bi) => (
             <group key={bi} position={[flip * SD/2 - flip*0.06, -0.06, z]}>
-              {/* Vertical arm */}
               <mesh position={[0, -0.28, 0]}>
                 <boxGeometry args={[0.05, 0.5, 0.05]} />
                 <meshStandardMaterial color="#b0b0a8" metalness={0.5} roughness={0.4} />
               </mesh>
-              {/* Horizontal arm */}
               <mesh position={[flip * SD/2 - flip*0.04, -0.52, 0]}>
                 <boxGeometry args={[SD - 0.08, 0.05, 0.05]} />
                 <meshStandardMaterial color="#b0b0a8" metalness={0.5} roughness={0.4} />
               </mesh>
-              {/* Diagonal brace */}
               <mesh
                 position={[flip * SD/4, -0.28, 0]}
                 rotation={[0, 0, flip * Math.PI * 0.28]}

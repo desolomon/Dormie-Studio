@@ -1,10 +1,11 @@
 "use client";
 
 import { useSearchParams } from "next/navigation";
-import { Suspense } from "react";
+import { Suspense, useState } from "react";
 import dynamic from "next/dynamic";
 import Sidebar from "@/components/studio/Sidebar";
 import { SCHOOLS } from "@/lib/schools";
+import { Product, SelectedItems, StyleId, STYLES } from "@/lib/products";
 
 // Load 3D canvas client-side only (no SSR)
 const StudioCanvas = dynamic(() => import("@/components/studio/StudioCanvas"), {
@@ -20,6 +21,25 @@ function StudioContent() {
   const params = useSearchParams();
   const schoolId = params.get("school") ?? "tulane";
   const school = SCHOOLS[schoolId] ?? SCHOOLS["tulane"];
+
+  const [selectedItems, setSelectedItems] = useState<SelectedItems>({});
+  const [activeStyle, setActiveStyle] = useState<StyleId | null>(null);
+
+  function handleSelect(subcategory: string, product: Product) {
+    setActiveStyle(null); // deselect style when manually overriding
+    setSelectedItems((prev) => ({ ...prev, [subcategory]: product }));
+  }
+
+  function handleStyleSelect(styleId: StyleId) {
+    if (activeStyle === styleId) {
+      // toggle off — clear everything
+      setActiveStyle(null);
+      setSelectedItems({});
+    } else {
+      setActiveStyle(styleId);
+      setSelectedItems(STYLES[styleId].items);
+    }
+  }
 
   return (
     <div className="flex flex-col h-screen">
@@ -42,8 +62,13 @@ function StudioContent() {
 
       {/* Main area */}
       <div className="flex flex-1 overflow-hidden">
-        <Sidebar />
-        <StudioCanvas school={school} />
+        <Sidebar
+          selectedItems={selectedItems}
+          onSelect={handleSelect}
+          activeStyle={activeStyle}
+          onStyleSelect={handleStyleSelect}
+        />
+        <StudioCanvas school={school} selectedItems={selectedItems} />
       </div>
     </div>
   );
