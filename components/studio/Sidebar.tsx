@@ -1,15 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { ColorGroup, PRODUCTS, Product, SelectedItems } from "@/lib/products";
 
 const CATEGORIES = [
+  { label: "All",        subcategories: [] as string[] },
   { label: "Bedding",    subcategories: ["Comforters", "Sheets", "Pillows", "Mattress Toppers"] },
   { label: "Furniture",  subcategories: ["Desk Chairs", "Shelves", "Bed Risers", "Side Tables"] },
   { label: "Decor",      subcategories: ["Posters", "String Lights", "Mirrors", "Rugs"] },
   { label: "Lighting",   subcategories: ["Desk Lamps", "Floor Lamps", "LED Strips"] },
   { label: "Storage",    subcategories: ["Under-Bed", "Closet Organizers", "Bins", "Hooks"] },
-  { label: "Desk Setup", subcategories: ["Monitors", "Desk Mats", "Organizers", "Accessories"] },
+  { label: "Desk",       subcategories: ["Monitors", "Desk Mats", "Organizers", "Accessories"] },
 ];
 
 type SidebarProps = {
@@ -18,240 +19,265 @@ type SidebarProps = {
   onDeselect: (subcategory: string) => void;
 };
 
-// Thumbnail with color fallback
-function ProductThumb({ thumbnail, color, label }: { thumbnail?: string; color: string; label: string }) {
+function getAllProducts(): { subcategory: string; product: Product }[] {
+  const results: { subcategory: string; product: Product }[] = [];
+  for (const [subcategory, groups] of Object.entries(PRODUCTS)) {
+    for (const group of groups as ColorGroup[]) {
+      for (const product of group.variants) {
+        results.push({ subcategory, product });
+      }
+    }
+  }
+  return results;
+}
+
+function ProductCard({
+  subcategory,
+  product,
+  isSelected,
+  onSelect,
+  onDeselect,
+}: {
+  subcategory: string;
+  product: Product;
+  isSelected: boolean;
+  onSelect: () => void;
+  onDeselect: () => void;
+}) {
   const [imgFailed, setImgFailed] = useState(false);
 
-  if (thumbnail && !imgFailed) {
-    return (
-      <img
-        src={thumbnail}
-        alt={label}
-        onError={() => setImgFailed(true)}
-        className="w-20 h-20 object-cover rounded-lg flex-shrink-0 border border-black/10"
-      />
-    );
-  }
   return (
     <div
-      className="w-20 h-20 rounded-lg flex-shrink-0 border border-black/10 flex items-center justify-center"
-      style={{ backgroundColor: color }}
-    />
+      className={`group relative bg-white border transition-all duration-150 cursor-pointer ${
+        isSelected
+          ? "border-[#0058a3] shadow-[0_0_0_2px_#0058a3]"
+          : "border-[#dfdfdf] hover:border-[#929292]"
+      }`}
+      onClick={() => (isSelected ? onDeselect() : onSelect())}
+    >
+      {isSelected && (
+        <div className="absolute top-2 right-2 z-10 w-5 h-5 bg-[#0058a3] rounded-full flex items-center justify-center shadow-sm">
+          <svg width="10" height="8" viewBox="0 0 10 8" fill="none">
+            <path d="M1 4L3.5 6.5L9 1" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          </svg>
+        </div>
+      )}
+
+      <div className="bg-[#f5f5f5] aspect-square flex items-center justify-center overflow-hidden">
+        {product.thumbnail && !imgFailed ? (
+          <img
+            src={product.thumbnail}
+            alt={product.label}
+            onError={() => setImgFailed(true)}
+            className="w-full h-full object-contain p-3 mix-blend-multiply"
+          />
+        ) : (
+          <div className="w-14 h-14 rounded" style={{ backgroundColor: product.color }} />
+        )}
+      </div>
+
+      <div className="p-2.5 pt-2">
+        <p className="text-[10px] font-bold text-[#111] uppercase tracking-wide leading-none mb-0.5">
+          {subcategory}
+        </p>
+        <p className="text-[11px] text-[#484848] leading-snug line-clamp-2 mb-1.5">
+          {product.label}
+        </p>
+        <p className="text-sm font-bold text-[#111]">{product.price}</p>
+
+        <div className="mt-1.5 space-y-0.5">
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#767676] flex-shrink-0" />
+            <span className="text-[10px] text-[#767676] truncate">Delivery availability un...</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#767676] flex-shrink-0" />
+            <span className="text-[10px] text-[#767676] truncate">Stock availability unk...</span>
+          </div>
+        </div>
+
+        {product.link && (
+          <a
+            href={product.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => e.stopPropagation()}
+            className="mt-2 block text-[10px] text-[#0058a3] hover:underline font-medium"
+          >
+            View product ↗
+          </a>
+        )}
+      </div>
+    </div>
   );
 }
 
 export default function Sidebar({ selectedItems, onSelect, onDeselect }: SidebarProps) {
-  const [openCat,   setOpenCat]   = useState<string | null>("Bedding");
-  const [openSub,   setOpenSub]   = useState<string | null>("Comforters");
-  const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [activeCategory, setActiveCategory] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
 
-  function toggleCat(cat: string) {
-    setOpenCat(openCat === cat ? null : cat);
-    setOpenSub(null);
-    setOpenGroup(null);
-  }
+  const allProducts = useMemo(() => getAllProducts(), []);
 
-  function toggleSub(sub: string) {
-    if (!PRODUCTS[sub]) return;
-    setOpenSub(openSub === sub ? null : sub);
-    setOpenGroup(null);
-  }
+  const filteredProducts = useMemo(() => {
+    let items = allProducts;
 
-  function toggleGroup(key: string) {
-    setOpenGroup(openGroup === key ? null : key);
-  }
+    if (activeCategory !== "All") {
+      const cat = CATEGORIES.find((c) => c.label === activeCategory);
+      if (cat && cat.subcategories.length > 0) {
+        items = items.filter((i) => cat.subcategories.includes(i.subcategory));
+      }
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      items = items.filter(
+        (i) =>
+          i.product.label.toLowerCase().includes(q) ||
+          i.subcategory.toLowerCase().includes(q)
+      );
+    }
+
+    return items;
+  }, [allProducts, activeCategory, searchQuery]);
+
+  const selectedCount = Object.keys(selectedItems).length;
+  const totalPrice = Object.values(selectedItems).reduce((sum, p) => {
+    if (!p) return sum;
+    const n = parseFloat(p.price.replace(/[^0-9.]/g, ""));
+    return sum + (isNaN(n) ? 0 : n);
+  }, 0);
 
   return (
-    <aside className="w-72 h-full bg-white border-r border-gray-100 flex flex-col overflow-y-auto">
-
+    <aside
+      className="w-[340px] h-full bg-white border-r border-[#dfdfdf] flex flex-col"
+      style={{ fontFamily: "'Noto Sans', Arial, sans-serif" }}
+    >
       {/* Header */}
-      <div className="px-4 py-4 border-b border-gray-100">
-        <h2 className="text-[10px] uppercase tracking-widest text-gray-400 font-medium">Customize Your Room</h2>
+      <div className="px-4 pt-4 pb-3 border-b border-[#dfdfdf]">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-[#111]">Featured items</h2>
+          <button className="text-xs text-[#111] underline hover:no-underline font-medium">
+            Show more products
+          </button>
+        </div>
+
+        <div className="relative">
+          <svg
+            className="absolute left-3 top-1/2 -translate-y-1/2 text-[#767676] pointer-events-none"
+            width="14" height="14" viewBox="0 0 24 24" fill="none"
+          >
+            <circle cx="11" cy="11" r="8" stroke="currentColor" strokeWidth="2" />
+            <path d="m21 21-4.35-4.35" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+          </svg>
+          <input
+            type="text"
+            placeholder="Search products..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-xs border border-[#929292] focus:outline-none focus:border-[#111] bg-white placeholder-[#767676]"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery("")}
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-[#767676] hover:text-[#111] text-sm leading-none"
+            >
+              ×
+            </button>
+          )}
+        </div>
       </div>
 
-      <nav className="flex-1 py-1">
-        {CATEGORIES.map((cat) => {
-          const isCatOpen = openCat === cat.label;
+      {/* Category tabs */}
+      <div className="flex items-center border-b border-[#dfdfdf] overflow-x-auto" style={{ scrollbarWidth: "none" }}>
+        {CATEGORIES.map((cat) => (
+          <button
+            key={cat.label}
+            onClick={() => setActiveCategory(cat.label)}
+            className={`px-3 py-2.5 text-[11px] font-medium whitespace-nowrap transition-colors flex-shrink-0 border-b-2 ${
+              activeCategory === cat.label
+                ? "border-[#111] text-[#111]"
+                : "border-transparent text-[#484848] hover:text-[#111] hover:border-[#dfdfdf]"
+            }`}
+          >
+            {cat.label}
+          </button>
+        ))}
+      </div>
 
-          return (
-            <div key={cat.label}>
-              {/* ── Category ── */}
-              <button
-                onClick={() => toggleCat(cat.label)}
-                className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-gray-50 transition-colors"
-              >
-                {cat.label}
-                <span className="text-gray-400 text-[10px]">{isCatOpen ? "▲" : "▼"}</span>
-              </button>
+      {/* Results count */}
+      <div className="px-4 py-2 bg-white border-b border-[#dfdfdf]">
+        <p className="text-[10px] text-[#767676]">
+          {filteredProducts.length} item{filteredProducts.length !== 1 ? "s" : ""}
+          {searchQuery ? ` for "${searchQuery}"` : ""}
+        </p>
+      </div>
 
-              {isCatOpen && (
-                <div className="bg-gray-50 border-t border-gray-100">
-                  {cat.subcategories.map((sub) => {
-                    const groups: ColorGroup[] | undefined = PRODUCTS[sub];
-                    const isSubOpen = openSub === sub;
-                    const hasProducts = !!groups;
+      {/* Product grid */}
+      <div className="flex-1 overflow-y-auto p-3">
+        {filteredProducts.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-32 text-center">
+            <p className="text-xs text-[#767676]">No products found</p>
+            <button
+              onClick={() => { setSearchQuery(""); setActiveCategory("All"); }}
+              className="mt-2 text-xs text-[#0058a3] underline"
+            >
+              Clear filters
+            </button>
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 gap-2.5">
+            {filteredProducts.slice(0, 60).map(({ subcategory, product }) => {
+              const isSelected = selectedItems[subcategory]?.id === product.id;
+              return (
+                <ProductCard
+                  key={product.id}
+                  subcategory={subcategory}
+                  product={product}
+                  isSelected={isSelected}
+                  onSelect={() => onSelect(subcategory, product)}
+                  onDeselect={() => onDeselect(subcategory)}
+                />
+              );
+            })}
+          </div>
+        )}
+      </div>
 
-                    // Any product in this sub selected?
-                    const selectedInSub = selectedItems[sub];
-
-                    return (
-                      <div key={sub}>
-                        {/* ── Subcategory ── */}
-                        <button
-                          onClick={() => toggleSub(sub)}
-                          disabled={!hasProducts}
-                          className={`w-full flex items-center justify-between px-7 py-2.5 text-sm transition-colors ${
-                            hasProducts
-                              ? "text-gray-700 hover:text-black hover:bg-gray-100 cursor-pointer"
-                              : "text-gray-400 cursor-default"
-                          } ${isSubOpen ? "bg-gray-100 font-medium" : ""}`}
-                        >
-                          <span className="flex items-center gap-2">
-                            {selectedInSub && (
-                              <span
-                                className="w-2 h-2 rounded-full flex-shrink-0"
-                                style={{ backgroundColor: selectedInSub.color }}
-                              />
-                            )}
-                            {sub}
-                            {!hasProducts && (
-                              <span className="text-[10px] text-gray-300">coming soon</span>
-                            )}
-                          </span>
-                          {hasProducts && (
-                            <span className="text-gray-400 text-[10px]">{isSubOpen ? "▲" : "▼"}</span>
-                          )}
-                        </button>
-
-                        {/* ── Color groups ── */}
-                        {isSubOpen && groups && (
-                          <div className="bg-white border-t border-gray-100">
-                            {groups.map((group) => {
-                              const groupKey = `${sub}-${group.id}`;
-                              const isGroupOpen = openGroup === groupKey;
-                              const selectedVariant = selectedItems[sub];
-                              const groupIsActive = group.variants.some(v => v.id === selectedVariant?.id);
-
-                              return (
-                                <div key={group.id}>
-                                  {/* ── Color group header ── */}
-                                  <button
-                                    onClick={() => toggleGroup(groupKey)}
-                                    className={`w-full flex items-center gap-3 px-9 py-2.5 text-sm transition-colors hover:bg-gray-50 ${
-                                      isGroupOpen ? "bg-gray-50 font-medium" : ""
-                                    }`}
-                                  >
-                                    {/* Color swatch */}
-                                    <span
-                                      className={`w-4 h-4 rounded-full flex-shrink-0 border-2 ${
-                                        groupIsActive ? "border-black" : "border-gray-300"
-                                      }`}
-                                      style={{ backgroundColor: group.color }}
-                                    />
-                                    <span className={`flex-1 text-left ${groupIsActive ? "text-black font-semibold" : "text-gray-600"}`}>
-                                      {group.label}
-                                    </span>
-                                    {groupIsActive && (
-                                      <span className="text-[10px] text-gray-500 mr-1">selected</span>
-                                    )}
-                                    <span className="text-gray-400 text-[10px]">{isGroupOpen ? "▲" : "▼"}</span>
-                                  </button>
-
-                                  {/* ── Product variants ── */}
-                                  {isGroupOpen && (
-                                    <div className="px-3 pb-3 bg-white border-t border-gray-100 space-y-2.5 pt-2.5">
-                                      {group.variants.map((product) => {
-                                        const isSelected = selectedItems[sub]?.id === product.id;
-
-                                        return (
-                                          <div
-                                            key={product.id}
-                                            className={`rounded-xl border overflow-hidden transition-all ${
-                                              isSelected
-                                                ? "border-black shadow-sm"
-                                                : "border-gray-200 hover:border-gray-300"
-                                            }`}
-                                          >
-                                            {/* Product info row */}
-                                            <div className="flex gap-3 p-2.5">
-                                              <ProductThumb
-                                                thumbnail={product.thumbnail}
-                                                color={product.color}
-                                                label={product.label}
-                                              />
-                                              <div className="flex-1 min-w-0 flex flex-col justify-between">
-                                                <div>
-                                                  <p className="text-xs font-semibold text-gray-800 leading-snug">{product.label}</p>
-                                                  <p className="text-sm font-bold text-gray-700 mt-1">{product.price}</p>
-                                                </div>
-                                                {/* Checkbox / select + deselect */}
-                                                <div className="mt-2 flex items-center gap-2">
-                                                  <button
-                                                    onClick={() => isSelected ? onDeselect(sub) : onSelect(sub, product)}
-                                                    className={`flex items-center gap-2 text-xs font-medium transition-colors ${
-                                                      isSelected ? "text-black" : "text-gray-500 hover:text-black"
-                                                    }`}
-                                                  >
-                                                    <span className={`w-4 h-4 rounded border-2 flex items-center justify-center flex-shrink-0 transition-all ${
-                                                      isSelected ? "bg-black border-black" : "border-gray-300"
-                                                    }`}>
-                                                      {isSelected && (
-                                                        <svg width="8" height="6" viewBox="0 0 8 6" fill="none">
-                                                          <path d="M1 3L3 5L7 1" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                                                        </svg>
-                                                      )}
-                                                    </span>
-                                                    {isSelected ? "Applied" : "Add to room"}
-                                                  </button>
-                                                  {isSelected && (
-                                                    <button
-                                                      onClick={() => onDeselect(sub)}
-                                                      className="text-[10px] text-gray-400 hover:text-red-500 transition-colors"
-                                                    >
-                                                      Remove
-                                                    </button>
-                                                  )}
-                                                </div>
-                                              </div>
-                                            </div>
-
-                                            {/* Shop link */}
-                                            {product.link && (
-                                              <a
-                                                href={product.link}
-                                                target="_blank"
-                                                rel="noopener noreferrer"
-                                                className="flex items-center justify-center gap-1.5 py-2 text-[11px] font-semibold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors border-t border-gray-100"
-                                              >
-                                                Shop This Item
-                                                <svg width="9" height="9" viewBox="0 0 9 9" fill="none">
-                                                  <path d="M1.5 7.5L7.5 1.5M7.5 1.5H2.5M7.5 1.5V6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-                                                </svg>
-                                              </a>
-                                            )}
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        )}
-                      </div>
-                    );
-                  })}
+      {/* Cart summary */}
+      {selectedCount > 0 && (
+        <div className="border-t border-[#dfdfdf] px-4 py-3 bg-[#f5f5f5]">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-[#111]">
+              {selectedCount} item{selectedCount !== 1 ? "s" : ""} in room
+            </span>
+            <span className="text-sm font-bold text-[#111]">
+              ${totalPrice.toFixed(2)}
+            </span>
+          </div>
+          <div className="flex flex-wrap gap-1 mb-2.5">
+            {Object.entries(selectedItems).map(([sub, product]) =>
+              product ? (
+                <div
+                  key={sub}
+                  className="flex items-center gap-1 bg-white border border-[#dfdfdf] px-2 py-0.5"
+                >
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ backgroundColor: product.color }} />
+                  <span className="text-[10px] text-[#111] max-w-[72px] truncate">{sub}</span>
+                  <button
+                    onClick={() => onDeselect(sub)}
+                    className="text-[#767676] hover:text-[#111] ml-0.5 text-xs leading-none"
+                  >
+                    ×
+                  </button>
                 </div>
-              )}
-            </div>
-          );
-        })}
-      </nav>
-
-      <div className="px-4 py-4 border-t border-gray-100">
-        <p className="text-[10px] text-gray-400">Dormie Studio · Tulane University</p>
-      </div>
+              ) : null
+            )}
+          </div>
+          <button className="w-full bg-[#0058a3] text-white text-xs font-bold py-2.5 hover:bg-[#004f93] transition-colors tracking-wide">
+            ADD ALL TO CART
+          </button>
+        </div>
+      )}
     </aside>
   );
 }
