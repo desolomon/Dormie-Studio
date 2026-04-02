@@ -3,19 +3,23 @@
 import { Canvas } from "@react-three/fiber";
 import { OrbitControls, ContactShadows } from "@react-three/drei";
 import Room from "./Room";
-import { School } from "@/lib/schools";
-import { SelectedItems } from "@/lib/products";
+import { SCHOOLS } from "@/lib/schools";
+import { Theme } from "@/lib/themes";
+import * as THREE from "three";
 
 type StudioCanvasProps = {
-  school: School;
-  selectedItems: SelectedItems;
+  theme: Theme;
 };
 
-export default function StudioCanvas({ school, selectedItems }: StudioCanvasProps) {
+export default function StudioCanvas({ theme }: StudioCanvasProps) {
+  const school = SCHOOLS["tulane"];
   const { width, depth, height } = school.dimensions;
+  const { lighting, colors } = theme;
+
+  const dirX = lighting.dirFromRight ? width * 1.5 : -width * 1.5;
 
   return (
-    <div className="flex-1 h-full bg-[#2a2a2a]">
+    <div className="w-full h-full">
       <Canvas
         shadows="soft"
         camera={{
@@ -24,26 +28,26 @@ export default function StudioCanvas({ school, selectedItems }: StudioCanvasProp
           near: 0.1,
           far: 300,
         }}
-        gl={{ antialias: true }}
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping }}
       >
-        {/* Warm ambient fill */}
-        <ambientLight intensity={0.55} color="#fff8f0" />
+        {/* Ambient fill */}
+        <ambientLight intensity={lighting.ambientIntensity} color={lighting.ambientColor} />
 
-        {/* Main ceiling fluorescent light (cool white) */}
+        {/* Ceiling point light */}
         <pointLight
           position={[0, height - 0.3, 0]}
-          intensity={3.5}
+          intensity={3.0}
           color="#fffcf0"
           castShadow
           shadow-mapSize={[1024, 1024]}
           shadow-radius={3}
         />
 
-        {/* Natural light from window (left wall, cool daylight) */}
+        {/* Directional key light */}
         <directionalLight
-          position={[-width * 1.5, height * 0.7, -depth * 0.3]}
-          intensity={1.8}
-          color="#d8ecf8"
+          position={[dirX, height * 0.7, -depth * 0.3]}
+          intensity={lighting.dirIntensity}
+          color={lighting.dirColor}
           castShadow
           shadow-mapSize={[2048, 2048]}
           shadow-camera-near={1}
@@ -55,25 +59,20 @@ export default function StudioCanvas({ school, selectedItems }: StudioCanvasProp
           shadow-bias={-0.001}
         />
 
-        {/* Soft bounce light from floor */}
-        <hemisphereLight
-          args={["#fff8f0", "#c0b8a8", 0.4]}
-        />
+        {/* Soft bounce from floor */}
+        <hemisphereLight args={[lighting.ambientColor as THREE.ColorRepresentation, "#c0b8a8", 0.35]} />
 
-        {/* Room */}
-        <Room width={width} depth={depth} height={height} selectedItems={selectedItems} />
+        <Room width={width} depth={depth} height={height} themeColors={colors} />
 
-        {/* Soft contact shadows on carpet */}
         <ContactShadows
           position={[0, 0.02, 0]}
-          opacity={0.5}
+          opacity={0.4}
           scale={35}
           blur={2.5}
           far={8}
           color="#3a3028"
         />
 
-        {/* Controls: left-drag to orbit, right-drag to pan, scroll to zoom */}
         <OrbitControls
           target={[0, height * 0.22, -depth * 0.1]}
           maxPolarAngle={Math.PI / 1.95}
